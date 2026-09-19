@@ -4,54 +4,43 @@ svcdesk_decisions:
   C2: immutable      # reopen | immutable
   C3: vip            # matrix | vip
 ---
-<!-- ai-generated: ??% - TODO: replace ?? with your estimate and say how AI was used (the advisory flags this line until you do) -->
+
+<!-- ai-generated: 0% - by hand -->
 
 # Decisions
 
-<!--
-How to fill this in (delete this comment when you are done):
-- The three values in the front matter must be the ones your RUNNING service exhibits. The checker probes the
-  service (checks 2.41, 2.35, 2.46) and compares them with this file (L1-CORE-4).
-- Keep the three headings starting with "## C1", "## C2", "## C3" and the five bold labels in each section. Write
-  at least 20 characters after every label; the lecturer reads this document, so write what you would say to
-  the service owner, not the minimum.
-- "Service owner": the role (never a person's name) who would sign this decision off, and why it is theirs.
-- "Customer outcome": what the reporter or the organisation gets from this choice, in one or two sentences.
-- Update the ai-generated line above to say how much of this text an AI wrote and how.
--->
-
 ## C1 - SLA clock for P1
 
-**Decision:** TODO
+**Decision:** P1 tickets run on a continuous wall-clock schedule 24/7 without pausing.
 
-**Rejected alternative:** TODO
+**Rejected alternative:** Pausing P1 tickets outside business hours until the next opening time.
 
-**Reason:** TODO
+**Reason:** P1 indicates an organization-wide halt; waiting until business hours causes unacceptable operational losses.
 
-**Service owner:** TODO
+**Service owner:** Incident Management Process Owner responsible for critical service continuity.
 
-**Customer outcome:** TODO
+**Customer outcome:** Critical incidents receive immediate, round-the-clock intervention and rapid resolution.
 
 ## C2 - Closed tickets and reopening
 
-**Decision:** TODO
+**Decision:** Closed tickets are permanently immutable and cannot be reopened under any circumstance.
 
-**Rejected alternative:** TODO
+**Rejected alternative:** Allowing reporters to reopen closed tickets within a 7-day post-closure window.
 
-**Reason:** TODO
+**Reason:** Preserves audit trail integrity and prevents skewing historical operational SLA metrics.
 
-**Service owner:** TODO
+**Service owner:** Service Desk Lead ensuring compliance, accurate reporting, and clean record-keeping.
 
-**Customer outcome:** TODO
+**Customer outcome:** Requesters receive traceable resolution history; recurring issues trigger linked tickets cleanly.
 
 ## C3 - VIP reporters and the priority matrix
 
-**Decision:** TODO
+**Decision:** Tickets from VIP reporters are escalated to at least P2 regardless of the matrix.
 
-**Rejected alternative:** TODO
+**Rejected alternative:** Deriving priority purely from the impact and urgency matrix ignoring reporter status.
 
-**Reason:** TODO
+**Reason:** Executive and critical roles carry outsized organizational risk requiring prioritized desk attention.
 
-**Service owner:** TODO
+**Service owner:** Head of Customer Support maintaining executive satisfaction and enterprise escalation SLAs.
 
-**Customer outcome:** TODO
+**Customer outcome:** Key personnel receive expedited triage avoiding administrative stalls on cosmetic issues.
