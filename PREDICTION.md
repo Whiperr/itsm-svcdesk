@@ -8,4 +8,4 @@ feature_path: "src/"
 
 # Prediction for METR-N1 Replication
 
-We predict that implementing the $n=1$ METR replication feature will take approximately 120 minutes of active development time, accurately measuring direction-neutral distribution metrics over the repository history.
+We predict that implementing the feature will take approximately 120 minutes of active development time.
