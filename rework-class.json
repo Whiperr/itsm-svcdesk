@@ -1,0 +1,9 @@
+{
+    "deployments":  10,
+    "source":  "git log",
+    "sha256":  "65d7b1dbe7cf62fb854ec204da18249ebe84a62485d3ebb6be2f69d905fd818f",
+    "deployment_rework_rate":  0.2,
+    "rework_deployments":  2,
+    "captured_at":  "2026-09-26T15:00:00Z",
+    "capture_path":  "src/main.py"
+}
