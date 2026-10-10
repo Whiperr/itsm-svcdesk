@@ -1,0 +1,56 @@
+# ai-generated: 0% - by hand
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: svcdesk-rules
+  labels:
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+    - name: svcdesk-slo
+      rules:
+        - alert: KbSearchErrorsBurnFast
+          expr: |
+            (
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[1h]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[1h]))
+              > 0.144
+            )
+            and
+            (
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[5m]))
+              > 0.144
+            )
+          for: 2m
+          labels:
+            service: svcdesk
+            slo: availability
+            severity: P1
+          annotations:
+            summary: "Fast error budget burn on /kb/search availability"
+        - alert: KbSearchErrorsBurnSlow
+          expr: |
+            (
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[6h]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[6h]))
+              > 0.06
+            )
+            and
+            (
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[30m]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[30m]))
+              > 0.06
+            )
+          for: 15m
+          labels:
+            service: svcdesk
+            slo: availability
+            severity: P2
+          annotations:
+            summary: "Slow error budget burn on /kb/search availability"

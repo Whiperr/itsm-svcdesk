@@ -1,0 +1,12 @@
+[
+  {
+    "name": "chat",
+    "attributes": {
+      "gen_ai.operation.name": "chat",
+      "gen_ai.request.model": "gpt-4",
+      "gen_ai.response.model": "gpt-4-0613",
+      "gen_ai.usage.input_tokens": 15,
+      "gen_ai.usage.output_tokens": 30
+    }
+  }
+]
