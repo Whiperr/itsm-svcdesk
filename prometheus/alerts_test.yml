@@ -1,0 +1,52 @@
+﻿---
+# ai-generated: 0% - by hand
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Pierwszy scenariusz: Duży, nagły skok błędów (testuje wyzwalanie alertów)
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="200"}'
+        values: '0+600x400'
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="502"}'
+        values: '0x10 0+300x390'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: KbSearchErrorsBurnFast
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: KbSearchErrorsBurnFast
+        exp_alerts:
+          - exp_labels:
+              service: svcdesk
+              slo: availability
+              severity: P1
+            exp_annotations:
+              summary: "Fast error budget burn on /kb/search availability"
+      - eval_time: 27m
+        alertname: KbSearchErrorsBurnSlow
+        exp_alerts: []
+      - eval_time: 28m
+        alertname: KbSearchErrorsBurnSlow
+        exp_alerts:
+          - exp_labels:
+              service: svcdesk
+              slo: availability
+              severity: P2
+            exp_annotations:
+              summary: "Slow error budget burn on /kb/search availability"
+
+  # Drugi scenariusz: 5% błędów (zabija mutanta, który obniża próg KbSearchErrorsBurnSlow poniżej 6%)
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="200"}'
+        values: '0+95x60'
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="502"}'
+        values: '0+5x60'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: KbSearchErrorsBurnSlow
+        exp_alerts: []

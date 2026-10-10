@@ -1,15 +1,21 @@
-# ai-generated: 90% - AI drafted implementation, adjusted SLA and tie rules
+# ai-generated: 85% - AI drafted implementation for Lab 3 endpoints and metrics, adjusted with existing codebase
 import os
 import uuid
-from datetime import datetime, time, timedelta, timezone
+import time
+import urllib.parse
+import urllib.request
+import json
+from datetime import datetime, time as dtime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from typing import Any, Optional
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from decimal import Decimal, ROUND_HALF_UP
+
+from prometheus_client import Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 app = FastAPI()
 
@@ -17,6 +23,61 @@ WARSAW_TZ = ZoneInfo("Europe/Warsaw")
 UTC_TZ = timezone.utc
 
 tickets_db: dict[str, dict[str, Any]] = {}
+
+KB_INDEX_URL = os.getenv("KB_INDEX_URL", "http://kb-index:8080")
+
+# Histogram dla Laboratorium 3 (M-04, M-06)
+REQUEST_DURATION = Histogram(
+    "http_server_request_duration_seconds",
+    "Duration of HTTP server requests in seconds",
+    ["http_request_method", "http_route", "http_response_status_code"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.2, 0.21, 0.22, 0.23, 0.24, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)
+)
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    method = request.method
+    start_time = time.time()
+
+    path = request.url.path
+    # Mapowanie tras na szablony (M-05: nigdy surowe ID ani query string w http_route)
+    if path == "/kb/search":
+        route = "/kb/search"
+    elif path == "/health":
+        route = "/health"
+    elif path == "/tickets":
+        route = "/tickets"
+    elif path.startswith("/tickets/") and len(path) > len("/tickets/"):
+        route = "/tickets/{id}"
+    elif path == "/dora/ticket-events":
+        route = "/dora/ticket-events"
+    elif path == "/dora/metrics":
+        route = "/dora/metrics"
+    else:
+        route = "unmatched"
+
+    status_code = "500"
+    try:
+        response = await call_next(request)
+        status_code = str(response.status_code)
+    except Exception:
+        raise
+    finally:
+        duration = time.time() - start_time
+        if path != "/metrics":
+            REQUEST_DURATION.labels(
+                http_request_method=method,
+                http_route=route,
+                http_response_status_code=status_code
+            ).observe(duration)
+
+    return response
+
+
+@app.get("/metrics")
+def metrics():
+    # Zgodnie z M-03: Content-Type text/plain
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.exception_handler(RequestValidationError)
@@ -95,18 +156,18 @@ def add_business_seconds(start_dt: datetime, target_seconds: int) -> datetime:
         if weekday >= 5:
             days_to_add = 7 - weekday
             next_day = current_local.date() + timedelta(days=days_to_add)
-            current_local = datetime.combine(next_day, time(8, 0, 0), tzinfo=WARSAW_TZ)
+            current_local = datetime.combine(next_day, dtime(8, 0, 0), tzinfo=WARSAW_TZ)
             continue
 
-        day_start = datetime.combine(current_local.date(), time(8, 0, 0), tzinfo=WARSAW_TZ)
-        day_end = datetime.combine(current_local.date(), time(16, 0, 0), tzinfo=WARSAW_TZ)
+        day_start = datetime.combine(current_local.date(), dtime(8, 0, 0), tzinfo=WARSAW_TZ)
+        day_end = datetime.combine(current_local.date(), dtime(16, 0, 0), tzinfo=WARSAW_TZ)
 
         if current_local < day_start:
             current_local = day_start
 
         if current_local >= day_end:
             next_day = current_local.date() + timedelta(days=1)
-            current_local = datetime.combine(next_day, time(8, 0, 0), tzinfo=WARSAW_TZ)
+            current_local = datetime.combine(next_day, dtime(8, 0, 0), tzinfo=WARSAW_TZ)
             continue
 
         available_seconds = int((day_end - current_local).total_seconds())
@@ -116,7 +177,7 @@ def add_business_seconds(start_dt: datetime, target_seconds: int) -> datetime:
         else:
             remaining_seconds -= available_seconds
             next_day = current_local.date() + timedelta(days=1)
-            current_local = datetime.combine(next_day, time(8, 0, 0), tzinfo=WARSAW_TZ)
+            current_local = datetime.combine(next_day, dtime(8, 0, 0), tzinfo=WARSAW_TZ)
 
     return current_local.astimezone(UTC_TZ)
 
@@ -144,12 +205,46 @@ def is_in_business_hours(dt: datetime) -> bool:
     local_dt = dt.astimezone(WARSAW_TZ)
     if local_dt.weekday() >= 5:
         return False
-    return time(8, 0, 0) <= local_dt.time() < time(16, 0, 0)
+    return dtime(8, 0, 0) <= local_dt.time() < dtime(16, 0, 0)
 
 
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "svcdesk"}
+
+
+# Nowy endpoint GET /kb/search dla Laboratorium 3 (M-02)
+@app.get("/kb/search")
+def kb_search(q: Optional[str] = None):
+    if not q or not isinstance(q, str) or len(q) > 200:
+        return JSONResponse(
+            status_code=400,
+            content={"error": {"code": "invalid_request", "message": "Query parameter q must be between 1 and 200 characters"}}
+        )
+
+    encoded_q = urllib.parse.quote(q)
+    upstream_url = f"{KB_INDEX_URL}/search?q={encoded_q}"
+
+    try:
+        req = urllib.request.Request(upstream_url, method="GET")
+        # Timeout min. 2s, brak cache, brak ponowień
+        with urllib.request.urlopen(req, timeout=3.0) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                return {
+                    "query": data.get("query", q),
+                    "hits": data.get("hits", [])
+                }
+            else:
+                return JSONResponse(
+                    status_code=502,
+                    content={"error": {"code": "upstream_unavailable"}}
+                )
+    except Exception:
+        return JSONResponse(
+            status_code=502,
+            content={"error": {"code": "upstream_unavailable"}}
+        )
 
 
 @app.post("/tickets", status_code=status.HTTP_201_CREATED)
@@ -339,13 +434,13 @@ def reopen_ticket(ticket_id: str, x_test_clock: Optional[str] = Header(None, ali
     ticket["closed_at"] = None
     return {k: v for k, v in ticket.items() if not k.startswith("_")}
 
+
 @app.get("/dora/ticket-events")
 def get_ticket_events():
     events = []
     for ticket in tickets_db.values():
         ticket_id = ticket["id"]
 
-        # 1. Created event (always present)
         if ticket.get("created_at"):
             events.append({
                 "ticket_id": ticket_id,
@@ -355,7 +450,6 @@ def get_ticket_events():
                 "state": "new"
             })
 
-        # 2. Acknowledged event
         if ticket.get("acknowledged_at"):
             events.append({
                 "ticket_id": ticket_id,
@@ -365,7 +459,6 @@ def get_ticket_events():
                 "state": "acknowledged"
             })
 
-        # 3. Resolved event
         if ticket.get("resolved_at"):
             events.append({
                 "ticket_id": ticket_id,
@@ -375,7 +468,6 @@ def get_ticket_events():
                 "state": "resolved"
             })
 
-        # 4. Closed event
         if ticket.get("closed_at"):
             events.append({
                 "ticket_id": ticket_id,
@@ -385,14 +477,15 @@ def get_ticket_events():
                 "state": "closed"
             })
 
-    # Sort strictly by `at` ascending, then `ticket_id` ascending
     events.sort(key=lambda x: (x["at"], x["ticket_id"]))
     return events
+
 
 def round_half_up(val: float, decimals: int = 6) -> float:
     d = Decimal(str(val))
     fmt = "0." + "0" * decimals if decimals > 0 else "0"
     return float(d.quantize(Decimal(fmt), rounding=ROUND_HALF_UP))
+
 
 def median(lst: list[int]) -> Optional[int]:
     if not lst:
@@ -404,6 +497,7 @@ def median(lst: list[int]) -> Optional[int]:
     else:
         return int(round_half_up((s[n // 2 - 1] + s[n // 2]) / 2.0, 0))
 
+
 @app.post("/dora/metrics")
 async def calculate_dora_metrics(request: Request):
     try:
@@ -411,7 +505,6 @@ async def calculate_dora_metrics(request: Request):
     except Exception:
         return JSONResponse(status_code=400, content={"error": {"code": "invalid_json"}}, headers={"content-type": "application/json"})
 
-    # Walidacja struktury okna
     window = body.get("window")
     events_raw = body.get("events")
 
@@ -430,7 +523,6 @@ async def calculate_dora_metrics(request: Request):
     if not isinstance(events_raw, list):
         return JSONResponse(status_code=400, content={"error": {"code": "events_not_array"}}, headers={"content-type": "application/json"})
 
-    # R-05: Deduplikacja po event_id (pierwsze wystąpienie wygrywa)
     seen_event_ids = set()
     events = []
     for ev in events_raw:
@@ -447,8 +539,7 @@ async def calculate_dora_metrics(request: Request):
         except Exception:
             return JSONResponse(status_code=400, content={"error": {"code": "malformed_timestamp"}}, headers={"content-type": "application/json"})
 
-    # Indeksowanie zasobów logu
-    commits_map = {} # sha -> commit_event
+    commits_map = {}
     reverts_count = 0
 
     for ev in events:
@@ -456,14 +547,10 @@ async def calculate_dora_metrics(request: Request):
             sha = ev.get("sha")
             if not sha:
                 return JSONResponse(status_code=400, content={"error": {"code": "commit_missing_sha"}}, headers={"content-type": "application/json"})
-            if sha in commits_map:
-                # Duplikat sha w logu (dobrze sformułowany log zakłada unikalność sha)
-                pass
             commits_map[sha] = ev
             if ev.get("reverts") is not None:
                 reverts_count += 1
 
-    # Well-formedness checks
     for ev in events:
         if ev["type"] == "commit":
             reverts = ev.get("reverts")
@@ -482,12 +569,10 @@ async def calculate_dora_metrics(request: Request):
                     return JSONResponse(status_code=400, content={"error": {"code": "deployment_sha_not_found"}}, headers={"content-type": "application/json"})
         elif ev["type"] == "incident":
             for dep_id in ev.get("deployments", []):
-                # Sprawdzenie czy deployment istnieje
                 dep_exists = any(e["type"] == "deployment" and e.get("deployment_id") == dep_id for e in events)
                 if not dep_exists:
                     return JSONResponse(status_code=400, content={"error": {"code": "incident_deployment_not_found"}}, headers={"content-type": "application/json"})
 
-    # R-06: Rozwiązywanie change_id tranzytywnie dla revertów
     def resolve_change_id(sha: str) -> Optional[str]:
         visited = set()
         current_sha = sha
@@ -505,7 +590,6 @@ async def calculate_dora_metrics(request: Request):
                 break
         return None
 
-    # R-07: Pierwszy commit instant dla każdej zmiany (w całym logu)
     change_first_commit_dt = {}
     for sha, c in commits_map.items():
         ch_id = resolve_change_id(sha)
@@ -514,7 +598,6 @@ async def calculate_dora_metrics(request: Request):
             if ch_id not in change_first_commit_dt or at_dt < change_first_commit_dt[ch_id]:
                 change_first_commit_dt[ch_id] = at_dt
 
-    # R-01 & R-02: Filtrowanie wdrożeń produkcyjnych w oknie [from, to)
     deployments = [e for e in events if e["type"] == "deployment"]
     prod_deployments_in_window = []
     for d in deployments:
@@ -530,10 +613,8 @@ async def calculate_dora_metrics(request: Request):
     successful_deployments_count = len(successful_deployments_list)
     failed_deployments_count = len(failed_deployments_list)
 
-    # R-10 (E4): Wdrożenia bez commitów
     deployments_without_commits = sum(1 for d in prod_deployments_in_window if not d.get("commits"))
 
-    # R-09 (E3): Commity spoza main w wdrożeniach produkcyjnych
     prod_shas = set()
     for d in prod_deployments_in_window:
         for sha in d.get("commits", []):
@@ -544,14 +625,11 @@ async def calculate_dora_metrics(request: Request):
             if commits_map[sha].get("branch") != "main":
                 commits_never_on_main += 1
 
-    # R-08 (E1): Change lead time & Negative lead time pairs
     lead_time_seconds_list = []
     lead_time_pairs_count = 0
     negative_lead_time_pairs = 0
 
-    # Mapowanie commit -> pierwsze udane wdrożenie w oknie (lub w ogóle)
     commit_first_success_dep = {}
-    # Dla każdego commita szukamy najwcześniejszego udanego wdrożenia, które go zawierało
     for sha in commits_map:
         earliest_dep_at = None
         for d in successful_deployments_list:
@@ -566,21 +644,17 @@ async def calculate_dora_metrics(request: Request):
         for sha in d.get("commits", []):
             if sha in commits_map:
                 c_at = commits_map[sha]["_at_dt"]
-                # Para jest tworzona przy pierwszym udanym wdrożeniu tego commita
-                # (sprawdzamy czy to d jest tym najwcześniejszym)
                 if commit_first_success_dep.get(sha) == d_at:
                     lead_time_pairs_count += 1
                     diff = int((d_at - c_at).total_seconds())
                     if diff < 0:
                         negative_lead_time_pairs += 1
-                        diff = 0 # R-03 clamp to zero
+                        diff = 0
                     lead_time_seconds_list.append(diff)
 
     change_lead_time_seconds_p50 = median(lead_time_seconds_list)
 
-    # R-12 & R-13 (E5 & E6): Incydenty i recovery time
     incidents = [e for e in events if e["type"] == "incident"]
-    # Grupowanie incydentów po incident_id
     incident_events_map = {}
     for inc in incidents:
         inc_id = inc.get("incident_id")
@@ -596,11 +670,8 @@ async def calculate_dora_metrics(request: Request):
         d_id = d.get("deployment_id")
         d_at = d["_at_dt"]
 
-        # Szukamy incydentów pokrywających to wdrożenie
         covering_incidents = []
         for inc_id, inc_list in incident_events_map.items():
-            # Sprawdzamy czy wdrożenie jest w deployments tego incydentu
-            # oraz czy incydent ma fazę opened
             opened_ev = next((x for x in inc_list if x.get("phase") == "opened" and d_id in x.get("deployments", [])), None)
             if opened_ev:
                 resolved_ev = next((x for x in inc_list if x.get("phase") == "resolved"), None)
@@ -614,7 +685,6 @@ async def calculate_dora_metrics(request: Request):
             open_failures += 1
             continue
 
-        # Wybór najwcześniej otwartego, przy remisie najniższy incident_id
         covering_incidents.sort(key=lambda x: (x["opened_at"], x["incident_id"]))
         chosen_cov = covering_incidents[0]
 
@@ -629,8 +699,6 @@ async def calculate_dora_metrics(request: Request):
 
     failed_deployment_recovery_time_seconds_p50 = median(recovery_times)
 
-    # R-13 (E6): Overlapping incident pairs
-    # Interwał incydentu: [opened, resolved) lub dla nierozwiązanych [opened, to)
     incident_intervals = []
     for inc_id, inc_list in incident_events_map.items():
         opened_ev = next((x for x in inc_list if x.get("phase") == "opened"), None)
@@ -646,25 +714,19 @@ async def calculate_dora_metrics(request: Request):
         for j in range(i + 1, n_incs):
             id_a, a_start, a_end = incident_intervals[i]
             id_b, b_start, b_end = incident_intervals[j]
-            # Przecięcie interwałów: a_start < b_end and b_start < a_end
             if a_start < b_end and b_start < a_end:
                 overlapping_incident_pairs += 1
 
-    # R-14: Change fail rate
     change_fail_rate = round_half_up(failed_deployments_count / total_deployments, 6) if total_deployments > 0 else None
 
-    # R-15: Deployment rework rate (unplanned == true and caused_by != null)
     rework_deployments_list = [d for d in prod_deployments_in_window if d.get("unplanned") is True and d.get("caused_by") is not None]
     rework_deployments_count = len(rework_deployments_list)
     deployment_rework_rate = round_half_up(rework_deployments_count / total_deployments, 6) if total_deployments > 0 else None
 
-    # R-11: Deployment frequency per day
     window_seconds = (to_dt - from_dt).total_seconds()
     window_days = window_seconds / 86400.0
     deployment_frequency_per_day = round_half_up(total_deployments / window_days, 6) if window_days > 0 else 0.0
 
-    # Ground truth (R-16, R-17)
-    # Unikalne zmiany dostarczone w oknie (przez udane wdrożenia)
     delivered_changes = set()
     change_first_successful_dep_in_window = {}
 
