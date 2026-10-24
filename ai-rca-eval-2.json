@@ -1,0 +1,40 @@
+{
+  "investigator": {
+    "agent": "gemini-cli 0.61.0",
+    "model": "gemini-3.8-flash",
+    "mcp_server": "prom_mcp.py (mcp 2.2.0)",
+    "transcript": "ai-rca/second/transcript.md"
+  },
+  "hypotheses": [
+    {
+      "id": "H1",
+      "hypothesis": "The payment service span \"charge\" experienced unexpected failure spikes causing downstream checkout timeouts.",
+      "component": "payment",
+      "predicts": "sum(rate(traces_span_metrics_calls_total{service_name=\"payment\", span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\"}[5m])) > 0.05",
+      "at": "2026-10-12T05:03:00Z",
+      "result": false,
+      "verdict": "hallucinated",
+      "evidence": "No payment server error rate exceeding 0.05/s observed at 05:03:00Z."
+    },
+    {
+      "id": "H2",
+      "hypothesis": "The email service suffered severe memory exhaustion leading to dropped notification spans during order processing.",
+      "component": "email",
+      "predicts": "sum(rate(traces_span_metrics_calls_total{service_name=\"email\", span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\"}[5m])) > 0.05",
+      "at": "2026-10-12T05:03:00Z",
+      "result": false,
+      "verdict": "hallucinated",
+      "evidence": "Email service error metrics show no dropped spans at 05:03:00Z."
+    },
+    {
+      "id": "H3",
+      "hypothesis": "The frontend proxy service incurred severe network latency spikes exceeding three seconds per request.",
+      "component": "frontend",
+      "predicts": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"frontend\", span_kind=\"SPAN_KIND_SERVER\"}[5m]))) > 3000",
+      "at": "2026-10-12T05:03:00Z",
+      "result": false,
+      "verdict": "hallucinated",
+      "evidence": "Frontend server p99 latency did not exceed 3000ms threshold during the window."
+    }
+  ]
+}

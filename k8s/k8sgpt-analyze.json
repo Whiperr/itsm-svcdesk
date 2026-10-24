@@ -1,0 +1,12 @@
+{
+  "provider": "local",
+  "results": [
+    {
+      "name": "default/flagd-config",
+      "details": "ConfigMap default/flagd-config is mounted but application-level flag changes do not trigger Kubernetes object state transitions.",
+      "parentObject": "",
+      "kind": "ConfigMap",
+      "level": "Low"
+    }
+  ]
+}
