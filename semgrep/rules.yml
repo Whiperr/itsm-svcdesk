@@ -5,11 +5,11 @@ rules:
     severity: WARNING
     languages: [python]
     patterns:
-      - pattern: urllib.request.urlopen($TARGET, ...)
-      - pattern-not: urllib.request.urlopen("...", ...)
+      - pattern: 'urllib.request.urlopen($TARGET, ...)'
+      - pattern-not: 'urllib.request.urlopen("...", ...)'
 
   - id: svcdesk-raw-exception-in-jsonresponse
     message: "Returning str(exc) in JSONResponse exposes internal exception details to the caller."
     severity: WARNING
     languages: [python]
-    pattern: JSONResponse(..., content={"error": {"code": $CODE, "message": str($EXC)}}, ...)
+    pattern: 'JSONResponse(..., content={"error": {"code": $CODE, "message": str($EXC)}}, ...)'
