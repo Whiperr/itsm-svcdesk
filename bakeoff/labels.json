@@ -1,0 +1,67 @@
+{
+  "set": "lab5-canary",
+  "defects": [
+    {
+      "id": "A04",
+      "file": "lab5-canary/app/avatar_fetch.py",
+      "class": "insecure-transport",
+      "cwe": "CWE-295",
+      "start_line": 7,
+      "end_line": 7
+    },
+    {
+      "id": "A10",
+      "file": "lab5-canary/app/session_store.py",
+      "class": "deserialization",
+      "cwe": "CWE-502",
+      "start_line": 15,
+      "end_line": 15
+    },
+    {
+      "id": "A11",
+      "file": "lab5-canary/app/sla_formula.py",
+      "class": "injection",
+      "cwe": "CWE-95",
+      "start_line": 6,
+      "end_line": 6
+    },
+    {
+      "id": "C03",
+      "file": "lab5-canary/config/github.py",
+      "class": "secret",
+      "cwe": "CWE-798",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "id": "C04",
+      "file": "lab5-canary/config/jwt_secret.py",
+      "class": "secret",
+      "cwe": "CWE-321",
+      "start_line": 2,
+      "end_line": 2
+    },
+    {
+      "id": "C05",
+      "file": "lab5-canary/config/mailer.py",
+      "class": "secret",
+      "cwe": "CWE-798",
+      "start_line": 4,
+      "end_line": 4
+    },
+    {
+      "id": "D01",
+      "file": "lab5-canary/requirements.txt",
+      "class": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "package": "cryptography"
+    },
+    {
+      "id": "D07",
+      "file": "lab5-canary/requirements.txt",
+      "class": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "package": "starlette"
+    }
+  ]
+}
