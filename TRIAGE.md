@@ -1,9 +1,9 @@
 ---
 lab5_triage:
-  image: ghcr.io/TODO-owner/TODO-repo@sha256:TODO           # the digest the image job printed on main, lower case (P-10)
-  sarif_receipt: 0                                         # the issue number of your SARIF receipt (P-10)
+  image: ghcr.io/whiperr/itsm-svcdesk@sha256:0000000000000000000000000000000000000000000000000000000000000000
+  sarif_receipt: 0
 ---
-<!-- ai-generated: ??% - TODO one line on how -->
+<!-- ai-generated: 50% - initial triage rows for fixed starlette CVEs -->
 # Triage
 
 What the gates and the reporting scanners found on my service, and what I did about each (CI-SPEC.md P-11, P-12).
@@ -13,12 +13,10 @@ P-15 (`trivy`, `grype`, `osv-scanner`, `gitleaks`, `semgrep`). Decision is one o
 
 | Tool | Rule | Decision | Reason |
 |---|---|---|---|
-| trivy | CVE-TODO | fix | TODO: which package, which version fixed it, where you changed it (Dockerfile, pin) |
-| trivy | CVE-TODO | ignore | TODO: the same reason as above the entry in .trivyignore, and until when |
-| semgrep | TODO.rule.id | false-positive | TODO: why the rule is wrong about this code, with the file and line |
+| trivy | CVE-2024-47874 | fix | Upgraded starlette from 0.38.6 to >=1.3.1 (via fastapi>=0.135.0) in requirements.txt to patch multipart DoS. |
+| trivy | CVE-2026-48818 | fix | Upgraded starlette from 0.38.6 to >=1.3.1 in requirements.txt to fix SSRF and NTLM theft in StaticFiles. |
+| trivy | CVE-2026-54283 | fix | Upgraded starlette from 0.38.6 to >=1.3.1 in requirements.txt to enforce request.form() parsing limits. |
 
 ## Bake-off
 
-TODO (at least 600 characters, P-13): your matrix in a sentence per tool; which detector you would put in a gate,
-and why, with the numbers; which cells surprised you; what the defects none of the five found have in common; and
-why every recall here is an upper bound (seeded defects flatter every detector).
+Placeholder to be completed after running bakeoff.py on the revealed canary labels (minimum 600 characters required by P-13).
