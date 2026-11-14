@@ -1,0 +1,15 @@
+# ai-generated: 80% - two custom Semgrep rules for svcdesk upstream urlopen and exception responses (P-31)
+rules:
+  - id: svcdesk-dynamic-urlopen
+    message: "urllib.request.urlopen called with a non-literal URL or Request object; ensure upstream scheme is restricted."
+    severity: WARNING
+    languages: [python]
+    patterns:
+      - pattern: urllib.request.urlopen($TARGET, ...)
+      - pattern-not: urllib.request.urlopen("...", ...)
+
+  - id: svcdesk-raw-exception-in-jsonresponse
+    message: "Returning str(exc) in JSONResponse exposes internal exception details to the caller."
+    severity: WARNING
+    languages: [python]
+    pattern: JSONResponse(..., content={"error": {"code": $CODE, "message": str($EXC)}}, ...)
